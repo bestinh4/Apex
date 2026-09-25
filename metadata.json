@@ -1,0 +1,6 @@
+{
+  "name": "Apex Bankroll - Terminal Quantitativo",
+  "description": "Terminal institucional de gestão de risco e banca esportiva com livro-razão auditável, análise estatística de EV, fluxo de caixa e hub de apostas grátis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
