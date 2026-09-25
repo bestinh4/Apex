@@ -42,16 +42,16 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-[#080c14] text-[#e2e8f0] flex flex-col bg-ambient-glow selection:bg-blue-500 selection:text-white">
-      {/* Fixed Header */}
+      {/* Top Header + Mobile Bottom Navigation */}
       <Navbar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         onOpenNewBetModal={handleOpenNewBet}
       />
 
-      {/* Main Content */}
-      <div className="pt-20 lg:pt-18 flex-1 flex flex-col">
-        <main className="w-full max-w-[1440px] mx-auto px-4 lg:px-8 py-6 flex-1">
+      {/* Main Content with safe padding for mobile bottom bar */}
+      <div className="pt-16 sm:pt-20 pb-20 lg:pb-10 flex-1 flex flex-col">
+        <main className="w-full max-w-[1440px] mx-auto px-3.5 sm:px-6 lg:px-8 py-3 sm:py-5 flex-1">
           {activeTab === 'dashboard' && (
             <DashboardView
               onOpenNewBetModal={handleOpenNewBet}
@@ -141,4 +141,3 @@ export function App() {
 }
 
 export default App;
-

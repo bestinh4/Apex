@@ -9,14 +9,17 @@ export const Toast: React.FC<ToastProps> = ({ message, onClose }) => {
   if (!message) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-3 bg-[#0e1422]/95 backdrop-blur-xl border border-emerald-500/30 text-white rounded-2xl shadow-2xl">
-      <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
-        <span className="material-symbols-outlined text-[18px]">check_circle</span>
+    <div className="fixed bottom-18 lg:bottom-5 left-3.5 right-3.5 sm:left-auto sm:right-5 z-50 flex items-center justify-between gap-3 px-4 py-3 bg-[#0e1422]/95 backdrop-blur-xl border border-emerald-500/30 text-white rounded-2xl shadow-2xl">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+          <span className="material-symbols-outlined text-[18px]">check_circle</span>
+        </div>
+        <span className="text-xs font-medium text-slate-200 truncate">{message}</span>
       </div>
-      <span className="text-xs font-medium text-slate-200">{message}</span>
       <button
+        type="button"
         onClick={onClose}
-        className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/[0.06] transition-colors ml-1"
+        className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/[0.06] transition-colors shrink-0"
       >
         <span className="material-symbols-outlined text-[16px]">close</span>
       </button>

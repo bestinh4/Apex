@@ -1,9 +1,16 @@
 import { BetEntry, TreasuryEntry, FreebetEntry, FreeSpinEntry, AppSettings } from '../types';
 
-export const initialBets: BetEntry[] = [
+// Clean default state ready for real use
+export const initialBets: BetEntry[] = [];
+export const initialTreasury: TreasuryEntry[] = [];
+export const initialFreebets: FreebetEntry[] = [];
+export const initialFreeSpins: FreeSpinEntry[] = [];
+
+// Optional sample dataset if the user wants to test/preview
+export const demoBets: BetEntry[] = [
   {
     id: "APX-9821",
-    date: "2025-05-18 16:00",
+    date: "18/05/2025 16:00",
     sport: "Futebol",
     event: "Real Madrid vs Manchester City",
     market: "Over 2.5 Gols FT",
@@ -19,7 +26,7 @@ export const initialBets: BetEntry[] = [
   },
   {
     id: "APX-9820",
-    date: "2025-05-18 14:30",
+    date: "18/05/2025 14:30",
     sport: "Basquete",
     event: "Boston Celtics vs NY Knicks",
     market: "Boston -5.5 Spread",
@@ -35,10 +42,10 @@ export const initialBets: BetEntry[] = [
   },
   {
     id: "APX-9819",
-    date: "2025-05-17 21:00",
+    date: "17/05/2025 21:00",
     sport: "Futebol",
     event: "Flamengo vs Palmeiras",
-    market: "Ambas Marcam (BTTS)",
+    market: "Ambas Marcam: Sim",
     odd: 1.83,
     stake: 50.00,
     units: 2.0,
@@ -51,7 +58,7 @@ export const initialBets: BetEntry[] = [
   },
   {
     id: "APX-9818",
-    date: "2025-05-17 19:15",
+    date: "17/05/2025 19:15",
     sport: "Tênis",
     event: "C. Alcaraz vs J. Sinner",
     market: "Alcaraz Vence 1º Set",
@@ -67,9 +74,9 @@ export const initialBets: BetEntry[] = [
   },
   {
     id: "APX-9817",
-    date: "2025-05-16 22:00",
+    date: "16/05/2025 22:00",
     sport: "MMA / eSports",
-    event: "UFC 305: Main Card Fight",
+    event: "UFC 305: Main Card",
     market: "Luta Não Vai Até o Fim",
     odd: 1.72,
     stake: 100.00,
@@ -82,24 +89,8 @@ export const initialBets: BetEntry[] = [
     closingOdd: 1.68
   },
   {
-    id: "APX-9816",
-    date: "2025-05-16 17:00",
-    sport: "Futebol",
-    event: "Arsenal vs Chelsea",
-    market: "Arsenal -1.0 HA",
-    odd: 2.05,
-    stake: 50.00,
-    units: 2.0,
-    type: "Saldo Real",
-    status: "VOID",
-    gross: 50.00,
-    pl: 0.00,
-    bookmaker: "Pinnacle",
-    closingOdd: 1.99
-  },
-  {
     id: "APX-9815",
-    date: "2025-05-15 20:30",
+    date: "15/05/2025 20:30",
     sport: "Basquete",
     event: "Golden State vs LA Lakers",
     market: "S. Curry Over 4.5 Triplos",
@@ -108,14 +99,14 @@ export const initialBets: BetEntry[] = [
     units: 1.0,
     type: "Freebet",
     status: "GREEN",
-    gross: 48.00,
+    gross: 23.00,
     pl: 23.00,
     bookmaker: "Betano",
     closingOdd: 1.85
   },
   {
     id: "APX-9814",
-    date: "2025-05-15 15:45",
+    date: "15/05/2025 15:45",
     sport: "Futebol",
     event: "Bayern München vs Dortmund",
     market: "Over 3.5 Gols FT",
@@ -130,40 +121,8 @@ export const initialBets: BetEntry[] = [
     closingOdd: 2.10
   },
   {
-    id: "APX-9813",
-    date: "2025-05-14 18:00",
-    sport: "Tênis",
-    event: "D. Medvedev vs A. Zverev",
-    market: "Over 22.5 Games",
-    odd: 1.88,
-    stake: 50.00,
-    units: 2.0,
-    type: "Saldo Real",
-    status: "CASHOUT",
-    gross: 65.00,
-    pl: 15.00,
-    bookmaker: "Betfair",
-    closingOdd: 1.85
-  },
-  {
-    id: "APX-9812",
-    date: "2025-05-14 13:00",
-    sport: "Futebol",
-    event: "Liverpool vs Aston Villa",
-    market: "Handicap Asiático +0.25 Aston",
-    odd: 2.02,
-    stake: 50.00,
-    units: 2.0,
-    type: "Saldo Real",
-    status: "HALF_RED",
-    gross: 25.00,
-    pl: -25.00,
-    bookmaker: "Pinnacle",
-    closingOdd: 1.98
-  },
-  {
     id: "APX-9811",
-    date: "2025-05-13 21:00",
+    date: "13/05/2025 21:00",
     sport: "MMA / eSports",
     event: "CS2 Major: Navi vs Furia",
     market: "Navi ML",
@@ -176,38 +135,12 @@ export const initialBets: BetEntry[] = [
     pl: 81.25,
     bookmaker: "Bet365",
     closingOdd: 1.58
-  },
-  {
-    id: "APX-9810",
-    date: "2025-05-12 16:30",
-    sport: "Basquete",
-    event: "Milwaukee Bucks vs Pacers",
-    market: "G. Antetokounmpo +12.5 Reb",
-    odd: 1.85,
-    stake: 50.00,
-    units: 2.0,
-    type: "Saldo Real",
-    status: "GREEN",
-    gross: 92.50,
-    pl: 42.50,
-    bookmaker: "Betano",
-    closingOdd: 1.80
   }
 ];
 
-export const initialTreasury: TreasuryEntry[] = [
-  {
-    id: "TX-1001",
-    date: "25/01/2025 14:32",
-    type: "DEPOSIT",
-    desc: "Aporte Inicial via Pix Banco Inter",
-    details: "Liquidação Imediata • Chave CNPJ Apex Liquidity",
-    amount: 1000.00,
-    status: "Compensado"
-  }
-];
+export const demoTreasury: TreasuryEntry[] = [];
 
-export const initialFreebets: FreebetEntry[] = [
+export const demoFreebets: FreebetEntry[] = [
   {
     id: "FB-001",
     bookmaker: "Betano",
@@ -218,43 +151,10 @@ export const initialFreebets: FreebetEntry[] = [
     netReturn: 55.00,
     status: "Ao Vivo",
     date: "Hoje, 16:00"
-  },
-  {
-    id: "FB-002",
-    bookmaker: "Bet365",
-    event: "Real Madrid vs Man City",
-    selection: "Ambas Marcam: Sim",
-    bonusAmount: 50.00,
-    odd: 1.80,
-    netReturn: 40.00,
-    status: "Creditado",
-    date: "Ontem, 16:00"
-  },
-  {
-    id: "FB-003",
-    bookmaker: "Stake",
-    event: "Palmeiras vs Flamengo",
-    selection: "Empate Anula: Palmeiras",
-    bonusAmount: 40.00,
-    odd: 2.25,
-    netReturn: 50.00,
-    status: "Creditado",
-    date: "14 Out, 19:00"
-  },
-  {
-    id: "FB-004",
-    bookmaker: "Pinnacle",
-    event: "Liverpool vs Chelsea",
-    selection: "Liverpool ML",
-    bonusAmount: 40.00,
-    odd: 1.75,
-    netReturn: 30.00,
-    status: "Creditado",
-    date: "12 Out, 12:30"
   }
 ];
 
-export const initialFreeSpins: FreeSpinEntry[] = [
+export const demoFreeSpins: FreeSpinEntry[] = [
   {
     id: "FS-001",
     provider: "Pragmatic Play",
@@ -263,33 +163,6 @@ export const initialFreeSpins: FreeSpinEntry[] = [
     spinsCount: 10,
     netProfit: 28.50,
     date: "Ontem, 21:14"
-  },
-  {
-    id: "FS-002",
-    provider: "Spribe",
-    game: "Aviator Rain Promo",
-    bookmaker: "EstrelaBet",
-    spinsCount: 1,
-    netProfit: 20.00,
-    date: "14 Out, 18:30"
-  },
-  {
-    id: "FS-003",
-    provider: "Play'n GO",
-    game: "Book of Dead",
-    bookmaker: "Bet365",
-    spinsCount: 5,
-    netProfit: 14.00,
-    date: "12 Out, 11:05"
-  },
-  {
-    id: "FS-004",
-    provider: "Playtech",
-    game: "Roleta Brasileira Ao Vivo",
-    bookmaker: "Betfair",
-    spinsCount: 1,
-    netProfit: 12.50,
-    date: "09 Out, 23:40"
   }
 ];
 
@@ -298,8 +171,8 @@ export const defaultSettings: AppSettings = {
   unitValue: 25.00,
   kellyFraction: "KELLY CRITERION 2.4 FRACTIONAL",
   maxDrawdownLimitPct: 25.0,
-  monthlyTargetPct: 60.0,
-  supabaseEndpoint: "giwvoaxkqmuepnjlrxgz.supabase.co",
+  monthlyTargetPct: 30.0,
+  supabaseEndpoint: "",
   supabaseSyncIntervalSec: 10,
   autoSync: true
 };

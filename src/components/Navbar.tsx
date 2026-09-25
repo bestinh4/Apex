@@ -1,7 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useBankroll } from '../context/BankrollContext';
 
-export type TabKey = 'dashboard' | 'livro-razao' | 'analise-estatistica' | 'fluxo-de-caixa' | 'giros-gratis-promocoes' | 'ajustes';
+export type TabKey =
+  | 'dashboard'
+  | 'livro-razao'
+  | 'analise-estatistica'
+  | 'fluxo-de-caixa'
+  | 'giros-gratis-promocoes'
+  | 'ajustes';
 
 interface NavbarProps {
   activeTab: TabKey;
@@ -15,7 +21,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNewBetModal
 }) => {
   const { currentEquity } = useBankroll();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const formatBRL = (val: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -25,138 +30,114 @@ export const Navbar: React.FC<NavbarProps> = ({
     }).format(val);
   };
 
-  const navItems: { key: TabKey; label: string; icon: string }[] = [
-    { key: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-    { key: 'livro-razao', label: 'Livro-Razão', icon: 'table_rows' },
-    { key: 'analise-estatistica', label: 'Estatísticas', icon: 'monitoring' },
-    { key: 'fluxo-de-caixa', label: 'Fluxo de Caixa', icon: 'account_balance' },
-    { key: 'giros-gratis-promocoes', label: 'Apostas Grátis', icon: 'redeem' },
-    { key: 'ajustes', label: 'Ajustes', icon: 'settings' }
+  const navItems: { key: TabKey; label: string; shortLabel: string; icon: string }[] = [
+    { key: 'dashboard', label: 'Dashboard', shortLabel: 'Início', icon: 'space_dashboard' },
+    { key: 'livro-razao', label: 'Livro-Razão', shortLabel: 'Histórico', icon: 'receipt_long' },
+    { key: 'analise-estatistica', label: 'Estatísticas', shortLabel: 'Dados', icon: 'monitoring' },
+    { key: 'fluxo-de-caixa', label: 'Fluxo de Caixa', shortLabel: 'Caixa', icon: 'account_balance' },
+    { key: 'giros-gratis-promocoes', label: 'Bônus & Freebets', shortLabel: 'Bônus', icon: 'redeem' },
+    { key: 'ajustes', label: 'Ajustes', shortLabel: 'Ajustes', icon: 'tune' }
   ];
 
   return (
-    <header className="fixed top-0 w-full z-50 bg-[#090d16]/85 backdrop-blur-xl border-b border-white/[0.06] transition-all">
-      <div className="h-16 w-full max-w-[1440px] mx-auto px-4 lg:px-8 flex items-center justify-between gap-4">
-        {/* Brand */}
-        <div className="flex items-center gap-3 shrink-0">
+    <>
+      {/* Top Bar */}
+      <header className="fixed top-0 left-0 right-0 z-40 h-14 sm:h-16 bg-[#080c14]/90 backdrop-blur-xl border-b border-white/[0.06]">
+        <div className="h-full w-full max-w-[1440px] mx-auto px-3.5 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
+          {/* Zone 1: Brand Wordmark */}
           <button
+            type="button"
             onClick={() => onSelectTab('dashboard')}
-            className="flex items-center gap-2.5 focus:outline-none group text-left"
+            className="text-sm sm:text-base font-bold tracking-tight text-white hover:text-blue-400 transition-colors whitespace-nowrap shrink-0"
           >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-emerald-400 p-[1.5px] shadow-sm shadow-blue-500/10 shrink-0 group-hover:scale-105 transition-transform">
-              <div className="w-full h-full bg-[#090d16] rounded-[10px] flex items-center justify-center overflow-hidden">
-                <img
-                  src="https://lh3.googleusercontent.com/aida/AEtjO1WoZ2OonAZtgfbpjmyqDMC7BwP47wp2q4JhTlWIwcDw3qYB4YkaPjOWU977gMq1EItDzj8mCvCVt9B5eySB_SUTup3fEOtEbXe_lgs3UvFeb0pLAIQOLLsVhvL_WBJgCcS7EjBoTT68czBA0UmmbDRlB0lDq3W1LEi3o4LY-1ud7gw6fuwPl20gPGIsVyo1iIGZWFgzU3EFf40Wrt74w8hNIQjBbkuJWtee9Phs5lAadnmJAHD6EehcIA"
-                  alt="Apex"
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5">
-                Apex Bankroll
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono tracking-wider uppercase">
-                Terminal Pro
-              </span>
-            </div>
+            Apex Bankroll
           </button>
-        </div>
 
-        {/* Navigation Tabs - Modern Segmented Control */}
-        <nav className="hidden lg:flex items-center bg-[#0d1322] p-1 rounded-xl border border-white/[0.06]">
-          {navItems.map((item) => {
-            const isActive = activeTab === item.key;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => onSelectTab(item.key)}
-                className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 ${
-                  isActive
-                    ? 'bg-slate-800 text-white shadow-sm font-semibold'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                }`}
-              >
-                <span className={`material-symbols-outlined text-[16px] ${isActive ? 'text-blue-400' : 'text-slate-500'}`}>
-                  {item.icon}
-                </span>
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+          {/* Zone 2: Desktop Navigation Links */}
+          <nav className="hidden lg:flex items-center gap-1 bg-[#0d1322] p-1 rounded-xl border border-white/[0.06]">
+            {navItems.map((item) => {
+              const isActive = activeTab === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => onSelectTab(item.key)}
+                  className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-slate-800 text-white font-semibold shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                  }`}
+                >
+                  <span
+                    className={`material-symbols-outlined text-[16px] ${
+                      isActive ? 'text-blue-400' : 'text-slate-500'
+                    }`}
+                  >
+                    {item.icon}
+                  </span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
 
-        {/* Right Section: Bankroll + Actions */}
-        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-          {/* Live Bankroll Balance Card */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0d1322] border border-white/[0.06]">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-            <div className="flex flex-col text-left">
-              <span className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
-                Banca Atual
-              </span>
-              <span className="font-mono text-xs sm:text-sm font-bold text-emerald-400 tracking-tight tabular-nums">
+          {/* Zone 3: Live Bankroll + Primary CTA */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => onSelectTab('fluxo-de-caixa')}
+              className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#0d1322] border border-white/[0.06] hover:border-white/[0.14] transition-colors"
+              title="Ver Fluxo de Caixa"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+              <span className="text-[11px] text-slate-400 hidden sm:inline">Banca:</span>
+              <span className="font-mono text-xs sm:text-sm font-bold text-emerald-400 tracking-tight tabular-nums whitespace-nowrap">
                 {formatBRL(currentEquity)}
               </span>
-            </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenNewBetModal}
+              className="px-3 sm:px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl shadow-md shadow-blue-600/20 active:scale-95 transition-all flex items-center gap-1 whitespace-nowrap shrink-0"
+            >
+              <span className="material-symbols-outlined text-[17px]">add</span>
+              <span>Nova Aposta</span>
+            </button>
           </div>
-
-          {/* Primary Action Button */}
-          <button
-            type="button"
-            onClick={onOpenNewBetModal}
-            className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-emerald-500 hover:from-blue-500 hover:to-emerald-400 text-white text-xs font-semibold rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-1.5 shrink-0"
-          >
-            <span className="material-symbols-outlined text-[18px] font-bold">add</span>
-            <span className="hidden sm:inline">Nova Aposta</span>
-          </button>
-
-          {/* Mobile Menu Toggle */}
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 rounded-xl bg-[#0d1322] border border-white/[0.06] text-slate-400 hover:text-white"
-            aria-label="Menu"
-          >
-            <span className="material-symbols-outlined text-[20px]">
-              {mobileMenuOpen ? 'close' : 'menu'}
-            </span>
-          </button>
         </div>
-      </div>
+      </header>
 
-      {/* Mobile Drawer Menu */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-white/[0.06] bg-[#090d16]/98 backdrop-blur-2xl p-4 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-150">
-          {navItems.map((item) => {
-            const isActive = activeTab === item.key;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => {
-                  onSelectTab(item.key);
-                  setMobileMenuOpen(false);
-                }}
-                className={`w-full px-3 py-2.5 text-xs font-medium rounded-xl text-left flex items-center gap-2.5 transition-colors ${
-                  isActive
-                    ? 'bg-slate-800 text-white font-semibold'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+      {/* Mobile Bottom Tab Bar (< lg) */}
+      <nav
+        aria-label="Navegação principal móvel"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-14 bg-[#080c14]/95 backdrop-blur-xl border-t border-white/[0.08] grid grid-cols-6 items-center px-1"
+      >
+        {navItems.map((item) => {
+          const isActive = activeTab === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => onSelectTab(item.key)}
+              className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                isActive ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[20px] leading-none">
+                {item.icon}
+              </span>
+              <span
+                className={`text-[10px] tracking-tight truncate max-w-full px-0.5 ${
+                  isActive ? 'font-semibold text-white' : 'font-medium text-slate-400'
                 }`}
               >
-                <span className={`material-symbols-outlined text-[18px] ${isActive ? 'text-blue-400' : 'text-slate-500'}`}>
-                  {item.icon}
-                </span>
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </header>
+                {item.shortLabel}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+    </>
   );
 };

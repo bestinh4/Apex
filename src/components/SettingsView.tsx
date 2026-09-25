@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useBankroll } from '../context/BankrollContext';
 
 interface SettingsViewProps {
@@ -7,131 +7,250 @@ interface SettingsViewProps {
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
-  onSuccessToast
+  onSuccessToast,
+  onNavigateTab
 }) => {
-  const { settings, updateSettings, resetData } = useBankroll();
+  const {
+    bets,
+    treasury,
+    freebets,
+    freeSpins,
+    settings,
+    updateSettings,
+    resetData,
+    loadDemoData,
+    importBackup
+  } = useBankroll();
 
   const [initialBankroll, setInitialBankroll] = useState(settings.initialBankroll.toString());
   const [unitValue, setUnitValue] = useState(settings.unitValue.toString());
-  const [copiedLink, setCopiedLink] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const htmlLogoUrl = "https://lh3.googleusercontent.com/aida/AEtjO1WoZ2OonAZtgfbpjmyqDMC7BwP47wp2q4JhTlWIwcDw3qYB4YkaPjOWU977gMq1EItDzj8mCvCVt9B5eySB_SUTup3fEOtEbXe_lgs3UvFeb0pLAIQOLLsVhvL_WBJgCcS7EjBoTT68czBA0UmmbDRlB0lDq3W1LEi3o4LY-1ud7gw6fuwPl20gPGIsVyo1iIGZWFgzU3EFf40Wrt74w8hNIQjBbkuJWtee9Phs5lAadnmJAHD6EehcIA";
+  const numBankroll = parseFloat(initialBankroll) || 1000;
+  const numUnit = parseFloat(unitValue) || 25;
+  const unitPct = numBankroll > 0 ? (numUnit / numBankroll) * 100 : 0;
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettings({
-      initialBankroll: parseFloat(initialBankroll) || 1000,
-      unitValue: parseFloat(unitValue) || 25
+      initialBankroll: numBankroll,
+      unitValue: numUnit
     });
-    onSuccessToast?.('Configurações salvas com sucesso!');
+    onSuccessToast?.('Configurações da banca salvas com sucesso!');
   };
 
-  const handleCopyLogoUrl = () => {
-    navigator.clipboard.writeText(htmlLogoUrl);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-    onSuccessToast?.('Link da imagem copiado!');
+  const applyUnitPctPreset = (pct: number) => {
+    const calculated = ((numBankroll * pct) / 100).toFixed(2);
+    setUnitValue(calculated);
+  };
+
+  const handleExportBackup = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      settings,
+      bets,
+      treasury,
+      freebets,
+      freeSpins
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json;charset=utf-8;'
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `apex_bankroll_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    onSuccessToast?.('Backup completo exportado com sucesso!');
+  };
+
+  const handleImportBackupFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(String(event.target?.result || '{}'));
+        importBackup(parsed);
+        if (parsed.settings?.initialBankroll) {
+          setInitialBankroll(String(parsed.settings.initialBankroll));
+        }
+        if (parsed.settings?.unitValue) {
+          setUnitValue(String(parsed.settings.unitValue));
+        }
+        onSuccessToast?.('Backup restaurado com sucesso!');
+      } catch {
+        onSuccessToast?.('Arquivo de backup inválido.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   return (
-    <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="w-full flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
       {/* Header */}
-      <div className="bg-[#0e1422]/90 border border-white/[0.07] rounded-2xl p-5 lg:p-6 shadow-sm">
-        <h2 className="text-lg font-bold text-white tracking-tight">Ajustes da Banca</h2>
-        <p className="text-xs text-slate-400">Defina o valor inicial de referência e o tamanho padrão das suas unidades</p>
+      <div className="bg-[#0e1422]/95 border border-white/[0.07] rounded-2xl p-4 sm:p-6 shadow-sm">
+        <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+          Ajustes & Gestão da Banca
+        </h2>
+        <p className="text-xs text-slate-400">
+          Defina sua banca inicial, tamanho da unidade (stake padrão) e gerencie seus dados locais
+        </p>
       </div>
 
       {/* Main Settings Form */}
-      <div className="bg-[#0e1422]/90 border border-white/[0.07] rounded-2xl p-5 lg:p-6 shadow-sm">
-        <form onSubmit={handleSave} className="flex flex-col gap-4">
+      <div className="bg-[#0e1422]/95 border border-white/[0.07] rounded-2xl p-4 sm:p-6 shadow-sm">
+        <form onSubmit={handleSave} className="flex flex-col gap-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Banca Inicial (R$)
+              <label className="text-xs font-semibold text-slate-300">
+                Banca Inicial de Referência (R$)
               </label>
               <input
                 type="number"
-                step="10"
-                min="10"
+                step="0.01"
+                min="1"
                 value={initialBankroll}
                 onChange={(e) => setInitialBankroll(e.target.value)}
-                className="bg-[#090d16] border border-white/[0.08] text-slate-200 font-mono px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-blue-500"
+                className="bg-[#080c14] border border-white/[0.08] text-white font-mono px-3.5 py-2.5 rounded-xl text-sm focus:outline-none focus:border-blue-500"
                 required
               />
-              <span className="text-[11px] text-slate-500">Capital de referência para cálculo de ROI e lucros</span>
+              <span className="text-[11px] text-slate-400">
+                Ponto de partida usado no gráfico de evolução e cálculo de crescimento
+              </span>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Valor de 1.0 Unidade / Stake Padrão (R$)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-300">
+                  Valor de 1.0 Unidade / Stake (R$)
+                </label>
+                <span className="text-[11px] font-mono text-blue-400 font-semibold tabular-nums">
+                  {unitPct.toFixed(1)}% da banca
+                </span>
+              </div>
               <input
                 type="number"
-                step="1"
-                min="1"
+                step="0.5"
+                min="0.5"
                 value={unitValue}
                 onChange={(e) => setUnitValue(e.target.value)}
-                className="bg-[#090d16] border border-white/[0.08] text-slate-200 font-mono px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-blue-500"
+                className="bg-[#080c14] border border-white/[0.08] text-white font-mono px-3.5 py-2.5 rounded-xl text-sm focus:outline-none focus:border-blue-500"
                 required
               />
-              <span className="text-[11px] text-slate-500">
-                Representa {((parseFloat(unitValue) / (parseFloat(initialBankroll) || 1)) * 100).toFixed(1)}% da sua banca inicial
-              </span>
+              {/* Quick Unit % Presets */}
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <span className="text-[11px] text-slate-400 mr-1">Atalhos:</span>
+                {[1, 2, 2.5, 5].map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => applyUnitPctPreset(pct)}
+                    className="px-2.5 py-1 rounded-lg bg-[#080c14] hover:bg-slate-800 border border-white/[0.07] text-[11px] font-mono text-slate-300 transition-colors"
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm('Deseja restaurar os dados de demonstração?')) {
-                  resetData();
-                  onSuccessToast?.('Dados restaurados para o padrão.');
-                }
-              }}
-              className="px-3.5 py-2 bg-[#090d16] hover:bg-rose-500/10 text-rose-400 border border-white/[0.08] hover:border-rose-500/30 rounded-xl text-xs font-medium transition-colors"
-            >
-              Restaurar Dados de Exemplo
-            </button>
-
+          <div className="flex items-center justify-end pt-3 border-t border-white/[0.06]">
             <button
               type="submit"
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-emerald-500 hover:from-blue-500 hover:to-emerald-400 text-white font-semibold rounded-xl text-xs transition-all active:scale-95 shadow-md shadow-blue-500/20"
+              className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-95 shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5"
             >
-              Salvar Alterações
+              <span className="material-symbols-outlined text-[16px]">check</span>
+              <span>Salvar Configurações</span>
             </button>
           </div>
         </form>
       </div>
 
-      {/* Direct HTML Asset Link Section */}
-      <div className="bg-[#0e1422]/90 border border-white/[0.07] rounded-2xl p-5 lg:p-6 shadow-sm flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-white tracking-tight">Link Direto da Imagem (HTML)</h3>
-            <p className="text-xs text-slate-400">URL direta do ativo visual extraído do HTML original</p>
-          </div>
-          <img
-            src={htmlLogoUrl}
-            alt="Logo"
-            className="w-8 h-8 rounded-lg bg-[#090d16] p-1 border border-white/[0.08]"
-          />
+      {/* Backup & Data Control */}
+      <div className="bg-[#0e1422]/95 border border-white/[0.07] rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col gap-4">
+        <div>
+          <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
+            Backup & Controle de Dados
+          </h3>
+          <p className="text-xs text-slate-400">
+            Seus dados ficam salvos automaticamente no seu aparelho. Exporte um backup ou limpe os registros quando desejar.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            readOnly
-            value={htmlLogoUrl}
-            className="flex-1 bg-[#090d16] border border-white/[0.08] rounded-xl px-3 py-2 text-xs font-mono text-slate-400 focus:outline-none"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
           <button
             type="button"
-            onClick={handleCopyLogoUrl}
-            className="px-3.5 py-2 bg-[#090d16] hover:bg-slate-800 border border-white/[0.08] text-slate-200 rounded-xl text-xs font-medium transition-colors"
+            onClick={handleExportBackup}
+            className="px-4 py-3 bg-[#080c14] hover:bg-slate-800/80 border border-white/[0.08] rounded-xl text-xs font-semibold text-slate-200 flex items-center justify-center gap-2 transition-colors"
           >
-            {copiedLink ? 'Copiado!' : 'Copiar URL'}
+            <span className="material-symbols-outlined text-[18px] text-blue-400">download</span>
+            <span>Exportar Backup (.json)</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="px-4 py-3 bg-[#080c14] hover:bg-slate-800/80 border border-white/[0.08] rounded-xl text-xs font-semibold text-slate-200 flex items-center justify-center gap-2 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px] text-emerald-400">upload_file</span>
+            <span>Importar Backup (.json)</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            onChange={handleImportBackupFile}
+            className="hidden"
+          />
+
+          <button
+            type="button"
+            onClick={() => {
+              loadDemoData();
+              onSuccessToast?.('Dados de demonstração carregados!');
+              onNavigateTab('dashboard');
+            }}
+            className="px-4 py-3 bg-[#080c14] hover:bg-slate-800/80 border border-white/[0.08] rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-center gap-2 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px] text-indigo-400">science</span>
+            <span>Carregar Exemplo</span>
+          </button>
+
+          {confirmClear ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  resetData();
+                  setConfirmClear(false);
+                  onSuccessToast?.('Todos os registros foram limpos!');
+                  onNavigateTab('dashboard');
+                }}
+                className="flex-1 py-3 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                Confirmar Limpeza
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmClear(false)}
+                className="py-3 px-3 bg-[#080c14] border border-white/[0.08] text-slate-400 rounded-xl text-xs"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmClear(true)}
+              className="px-4 py-3 bg-[#080c14] hover:bg-rose-500/10 text-rose-400 border border-white/[0.08] hover:border-rose-500/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+              <span>Zerar Todos os Dados</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

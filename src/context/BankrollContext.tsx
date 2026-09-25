@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { BetEntry, TreasuryEntry, FreebetEntry, FreeSpinEntry, AppSettings, BetStatus } from '../types';
-import { initialBets, initialTreasury, initialFreebets, initialFreeSpins, defaultSettings } from '../data/initialData';
+import {
+  initialBets,
+  initialTreasury,
+  initialFreebets,
+  initialFreeSpins,
+  demoBets,
+  demoTreasury,
+  demoFreebets,
+  demoFreeSpins,
+  defaultSettings
+} from '../data/initialData';
 
 interface BankrollContextType {
   bets: BetEntry[];
@@ -15,9 +25,20 @@ interface BankrollContextType {
   addTreasury: (tx: Omit<TreasuryEntry, 'id'>) => void;
   deleteTreasury: (id: string) => void;
   addFreebet: (fb: Omit<FreebetEntry, 'id'>) => void;
+  updateFreebetStatus: (id: string, status: FreebetEntry['status']) => void;
+  deleteFreebet: (id: string) => void;
   addFreeSpin: (spin: Omit<FreeSpinEntry, 'id'>) => void;
+  deleteFreeSpin: (id: string) => void;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   resetData: () => void;
+  loadDemoData: () => void;
+  importBackup: (data: {
+    bets?: BetEntry[];
+    treasury?: TreasuryEntry[];
+    freebets?: FreebetEntry[];
+    freeSpins?: FreeSpinEntry[];
+    settings?: AppSettings;
+  }) => void;
   // Computed metrics
   totalDeposits: number;
   totalWithdrawals: number;
@@ -45,32 +66,52 @@ interface BankrollContextType {
 
 const BankrollContext = createContext<BankrollContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_PREFIX = 'apex_bankroll_';
+const LOCAL_STORAGE_PREFIX = 'apex_bankroll_clean_v1_';
 
 export function BankrollProvider({ children }: { children: ReactNode }) {
   const [bets, setBets] = useState<BetEntry[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}bets`);
-    return saved ? JSON.parse(saved) : initialBets;
+    try {
+      const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}bets`);
+      return saved ? JSON.parse(saved) : initialBets;
+    } catch {
+      return initialBets;
+    }
   });
 
   const [treasury, setTreasury] = useState<TreasuryEntry[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}treasury`);
-    return saved ? JSON.parse(saved) : initialTreasury;
+    try {
+      const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}treasury`);
+      return saved ? JSON.parse(saved) : initialTreasury;
+    } catch {
+      return initialTreasury;
+    }
   });
 
   const [freebets, setFreebets] = useState<FreebetEntry[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}freebets`);
-    return saved ? JSON.parse(saved) : initialFreebets;
+    try {
+      const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}freebets`);
+      return saved ? JSON.parse(saved) : initialFreebets;
+    } catch {
+      return initialFreebets;
+    }
   });
 
   const [freeSpins, setFreeSpins] = useState<FreeSpinEntry[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}freespins`);
-    return saved ? JSON.parse(saved) : initialFreeSpins;
+    try {
+      const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}freespins`);
+      return saved ? JSON.parse(saved) : initialFreeSpins;
+    } catch {
+      return initialFreeSpins;
+    }
   });
 
   const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}settings`);
-    return saved ? JSON.parse(saved) : defaultSettings;
+    try {
+      const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}settings`);
+      return saved ? JSON.parse(saved) : defaultSettings;
+    } catch {
+      return defaultSettings;
+    }
   });
 
   useEffect(() => {
@@ -93,7 +134,7 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(`${LOCAL_STORAGE_PREFIX}settings`, JSON.stringify(settings));
   }, [settings]);
 
-  // Compute Bet outcomes correctly based on status and fund type
+  // Compute Bet outcomes accurately based on status and fund type
   const calculateGrossAndPL = (stake: number, odd: number, status: BetStatus, type: string) => {
     let gross = 0;
     let pl = 0;
@@ -107,16 +148,21 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
         pl = gross - stake;
       }
     } else if (status === 'HALF_GREEN') {
-      gross = stake + (stake * (odd - 1)) / 2;
-      pl = gross - stake;
+      if (type === 'Freebet') {
+        gross = (stake * (odd - 1)) / 2;
+        pl = gross;
+      } else {
+        gross = stake + (stake * (odd - 1)) / 2;
+        pl = gross - stake;
+      }
     } else if (status === 'RED') {
       gross = 0;
       pl = type === 'Freebet' ? 0 : -stake;
     } else if (status === 'HALF_RED') {
-      gross = stake / 2;
-      pl = -stake / 2;
+      gross = type === 'Freebet' ? 0 : stake / 2;
+      pl = type === 'Freebet' ? 0 : -stake / 2;
     } else if (status === 'VOID') {
-      gross = stake;
+      gross = type === 'Freebet' ? 0 : stake;
       pl = 0;
     } else if (status === 'CASHOUT') {
       gross = stake * 1.15;
@@ -130,51 +176,56 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
   };
 
   const addBet = (newBet: Omit<BetEntry, 'id' | 'gross' | 'pl'> & { gross?: number; pl?: number }) => {
-    const { gross, pl } = newBet.gross !== undefined && newBet.pl !== undefined
-      ? { gross: newBet.gross, pl: newBet.pl }
-      : calculateGrossAndPL(newBet.stake, newBet.odd, newBet.status, newBet.type);
+    const { gross, pl } =
+      newBet.gross !== undefined && newBet.pl !== undefined
+        ? { gross: newBet.gross, pl: newBet.pl }
+        : calculateGrossAndPL(newBet.stake, newBet.odd, newBet.status, newBet.type);
 
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const entry: BetEntry = {
       ...newBet,
       id: `APX-${randomSuffix}`,
-      units: Number((newBet.stake / settings.unitValue).toFixed(2)),
+      units: Number((newBet.stake / (settings.unitValue || 1)).toFixed(2)),
       gross,
       pl
     };
 
-    setBets(prev => [entry, ...prev]);
+    setBets((prev) => [entry, ...prev]);
   };
 
   const updateBet = (id: string, updated: Partial<BetEntry>) => {
-    setBets(prev => prev.map(bet => {
-      if (bet.id !== id) return bet;
-      const merged = { ...bet, ...updated };
-      const { gross, pl } = calculateGrossAndPL(merged.stake, merged.odd, merged.status, merged.type);
-      return {
-        ...merged,
-        units: Number((merged.stake / settings.unitValue).toFixed(2)),
-        gross,
-        pl
-      };
-    }));
+    setBets((prev) =>
+      prev.map((bet) => {
+        if (bet.id !== id) return bet;
+        const merged = { ...bet, ...updated };
+        const { gross, pl } = calculateGrossAndPL(merged.stake, merged.odd, merged.status, merged.type);
+        return {
+          ...merged,
+          units: Number((merged.stake / (settings.unitValue || 1)).toFixed(2)),
+          gross,
+          pl
+        };
+      })
+    );
   };
 
   const deleteBet = (id: string) => {
-    setBets(prev => prev.filter(bet => bet.id !== id));
+    setBets((prev) => prev.filter((bet) => bet.id !== id));
   };
 
   const resolveBet = (id: string, status: BetStatus) => {
-    setBets(prev => prev.map(bet => {
-      if (bet.id !== id) return bet;
-      const { gross, pl } = calculateGrossAndPL(bet.stake, bet.odd, status, bet.type);
-      return {
-        ...bet,
-        status,
-        gross,
-        pl
-      };
-    }));
+    setBets((prev) =>
+      prev.map((bet) => {
+        if (bet.id !== id) return bet;
+        const { gross, pl } = calculateGrossAndPL(bet.stake, bet.odd, status, bet.type);
+        return {
+          ...bet,
+          status,
+          gross,
+          pl
+        };
+      })
+    );
   };
 
   const addTreasury = (tx: Omit<TreasuryEntry, 'id'>) => {
@@ -183,46 +234,79 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
       ...tx,
       id: `TX-${randomSuffix}`
     };
-    setTreasury(prev => [entry, ...prev]);
+    setTreasury((prev) => [entry, ...prev]);
   };
 
   const deleteTreasury = (id: string) => {
-    setTreasury(prev => prev.filter(tx => tx.id !== id));
+    setTreasury((prev) => prev.filter((tx) => tx.id !== id));
   };
 
   const addFreebet = (fb: Omit<FreebetEntry, 'id'>) => {
     const randomSuffix = Math.floor(100 + Math.random() * 900);
-    setFreebets(prev => [{ ...fb, id: `FB-${randomSuffix}` }, ...prev]);
+    setFreebets((prev) => [{ ...fb, id: `FB-${randomSuffix}` }, ...prev]);
+  };
+
+  const updateFreebetStatus = (id: string, status: FreebetEntry['status']) => {
+    setFreebets((prev) => prev.map((fb) => (fb.id === id ? { ...fb, status } : fb)));
+  };
+
+  const deleteFreebet = (id: string) => {
+    setFreebets((prev) => prev.filter((fb) => fb.id !== id));
   };
 
   const addFreeSpin = (spin: Omit<FreeSpinEntry, 'id'>) => {
     const randomSuffix = Math.floor(100 + Math.random() * 900);
-    setFreeSpins(prev => [{ ...spin, id: `FS-${randomSuffix}` }, ...prev]);
+    setFreeSpins((prev) => [{ ...spin, id: `FS-${randomSuffix}` }, ...prev]);
+  };
+
+  const deleteFreeSpin = (id: string) => {
+    setFreeSpins((prev) => prev.filter((fs) => fs.id !== id));
   };
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    setSettings((prev) => ({ ...prev, ...newSettings }));
   };
 
   const resetData = () => {
-    setBets(initialBets);
-    setTreasury(initialTreasury);
-    setFreebets(initialFreebets);
-    setFreeSpins(initialFreeSpins);
-    setSettings(defaultSettings);
-    localStorage.clear();
+    setBets([]);
+    setTreasury([]);
+    setFreebets([]);
+    setFreeSpins([]);
+  };
+
+  const loadDemoData = () => {
+    setBets(demoBets);
+    setTreasury(demoTreasury);
+    setFreebets(demoFreebets);
+    setFreeSpins(demoFreeSpins);
+  };
+
+  const importBackup = (data: {
+    bets?: BetEntry[];
+    treasury?: TreasuryEntry[];
+    freebets?: FreebetEntry[];
+    freeSpins?: FreeSpinEntry[];
+    settings?: AppSettings;
+  }) => {
+    if (Array.isArray(data.bets)) setBets(data.bets);
+    if (Array.isArray(data.treasury)) setTreasury(data.treasury);
+    if (Array.isArray(data.freebets)) setFreebets(data.freebets);
+    if (Array.isArray(data.freeSpins)) setFreeSpins(data.freeSpins);
+    if (data.settings && typeof data.settings === 'object') {
+      setSettings((prev) => ({ ...prev, ...data.settings }));
+    }
   };
 
   // Computations
   const totalDeposits = useMemo(() => {
     return treasury
-      .filter(t => t.type === 'DEPOSIT')
+      .filter((t) => t.type === 'DEPOSIT' || t.type === 'BONUS')
       .reduce((sum, t) => sum + t.amount, 0);
   }, [treasury]);
 
   const totalWithdrawals = useMemo(() => {
     return treasury
-      .filter(t => t.type === 'WITHDRAW')
+      .filter((t) => t.type === 'WITHDRAW')
       .reduce((sum, t) => sum + t.amount, 0);
   }, [treasury]);
 
@@ -232,7 +316,7 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
 
   const totalFreebetsProfit = useMemo(() => {
     return freebets
-      .filter(f => f.status === 'Creditado')
+      .filter((f) => f.status === 'Creditado')
       .reduce((sum, f) => sum + f.netReturn, 0);
   }, [freebets]);
 
@@ -255,7 +339,7 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     let voids = 0;
     let turnover = 0;
 
-    bets.forEach(b => {
+    bets.forEach((b) => {
       if (b.status === 'PENDENTE') {
         exposure += b.stake;
         openCount++;
@@ -287,7 +371,7 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
   }, [bets]);
 
   const currentEquity = useMemo(() => {
-    return settings.initialBankroll + netBetProfit + totalSpinsProfit + (totalDeposits - 1000 - totalWithdrawals);
+    return settings.initialBankroll + netBetProfit + totalSpinsProfit + totalDeposits - totalWithdrawals;
   }, [settings.initialBankroll, netBetProfit, totalSpinsProfit, totalDeposits, totalWithdrawals]);
 
   const winRate = useMemo(() => {
@@ -299,17 +383,32 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     return turnoverVolume > 0 ? (netBetProfit / turnoverVolume) * 100 : 0;
   }, [netBetProfit, turnoverVolume]);
 
-  // Streaks computation
-  const { maxWinStreak, maxLossStreak, currentStreakText } = useMemo(() => {
+  // Real streaks & drawdown computation
+  const { maxWinStreak, maxLossStreak, currentStreakText, maxDrawdownPct } = useMemo(() => {
     let maxW = 0;
     let maxL = 0;
     let currentW = 0;
     let currentL = 0;
 
-    // Ordered chronological (oldest to newest)
-    const reversed = [...bets].filter(b => b.status !== 'PENDENTE' && b.status !== 'VOID').reverse();
+    // Chronological order (oldest to newest)
+    const chronological = [...bets].filter((b) => b.status !== 'PENDENTE').reverse();
 
-    reversed.forEach(b => {
+    let runningEquity = settings.initialBankroll;
+    let peakEquity = settings.initialBankroll;
+    let maxDd = 0;
+
+    chronological.forEach((b) => {
+      runningEquity += b.pl;
+      if (runningEquity > peakEquity) {
+        peakEquity = runningEquity;
+      }
+      if (peakEquity > 0) {
+        const dd = ((peakEquity - runningEquity) / peakEquity) * 100;
+        if (dd > maxDd) maxDd = dd;
+      }
+
+      if (b.status === 'VOID') return;
+
       if (b.status === 'GREEN' || b.status === 'HALF_GREEN') {
         currentW++;
         currentL = 0;
@@ -321,30 +420,20 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // Check most recent
-    let streakText = '+3 Vencidas';
-    if (bets.length > 0) {
-      const first = bets.find(b => b.status !== 'PENDENTE' && b.status !== 'VOID');
-      if (first) {
-        if (first.status === 'GREEN' || first.status === 'HALF_GREEN') {
-          streakText = `+${Math.max(1, currentW)} Vencidas`;
-        } else {
-          streakText = `-${Math.max(1, currentL)} Perdidas`;
-        }
-      }
+    let streakText = 'Sem histórico';
+    if (currentW > 0) {
+      streakText = `+${currentW} ${currentW === 1 ? 'Green seguido' : 'Greens seguidos'}`;
+    } else if (currentL > 0) {
+      streakText = `-${currentL} ${currentL === 1 ? 'Red seguido' : 'Reds seguidos'}`;
     }
 
     return {
-      maxWinStreak: Math.max(11, maxW),
-      maxLossStreak: Math.max(4, maxL),
-      currentStreakText: streakText
+      maxWinStreak: maxW,
+      maxLossStreak: maxL,
+      currentStreakText: streakText,
+      maxDrawdownPct: maxDd
     };
-  }, [bets]);
-
-  // Drawdown
-  const maxDrawdownPct = useMemo(() => {
-    return 6.42; // standard baseline reflecting historical peak
-  }, []);
+  }, [bets, settings.initialBankroll]);
 
   const monthlyTargetAmount = (settings.initialBankroll * settings.monthlyTargetPct) / 100;
   const stopLossDistance = (settings.initialBankroll * settings.maxDrawdownLimitPct) / 100;
@@ -364,9 +453,14 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
         addTreasury,
         deleteTreasury,
         addFreebet,
+        updateFreebetStatus,
+        deleteFreebet,
         addFreeSpin,
+        deleteFreeSpin,
         updateSettings,
         resetData,
+        loadDemoData,
+        importBackup,
         totalDeposits,
         totalWithdrawals,
         netBetProfit,
