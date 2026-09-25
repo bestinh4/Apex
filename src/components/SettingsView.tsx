@@ -1,5 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { useBankroll } from '../context/BankrollContext';
+import {
+  SUPABASE_PROJECT_REF,
+  SUPABASE_REGION,
+  DEFAULT_SUPABASE_URL,
+  SUPABASE_SQL_SCHEMA
+} from '../lib/supabase';
 
 interface SettingsViewProps {
   onSuccessToast?: (msg: string) => void;
@@ -19,12 +25,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     updateSettings,
     resetData,
     loadDemoData,
-    importBackup
+    importBackup,
+    syncNow
   } = useBankroll();
 
   const [initialBankroll, setInitialBankroll] = useState(settings.initialBankroll.toString());
   const [unitValue, setUnitValue] = useState(settings.unitValue.toString());
   const [confirmClear, setConfirmClear] = useState(false);
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const numBankroll = parseFloat(initialBankroll) || 1000;
@@ -43,6 +52,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const applyUnitPctPreset = (pct: number) => {
     const calculated = ((numBankroll * pct) / 100).toFixed(2);
     setUnitValue(calculated);
+  };
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    const ok = await syncNow();
+    setIsSyncing(false);
+    if (ok) {
+      onSuccessToast?.('Dados sincronizados com o Supabase com sucesso!');
+    } else {
+      setShowSqlModal(true);
+      onSuccessToast?.('Copie e execute o script SQL abaixo no Supabase para criar as tabelas.');
+    }
+  };
+
+  const handleCopySql = async () => {
+    try {
+      await navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
+      onSuccessToast?.('Script SQL copiado para a área de transferência!');
+    } catch {
+      onSuccessToast?.('Selecione e copie o script SQL abaixo.');
+      setShowSqlModal(true);
+    }
   };
 
   const handleExportBackup = () => {
@@ -96,7 +127,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           Ajustes & Gestão da Banca
         </h2>
         <p className="text-xs text-slate-400">
-          Defina sua banca inicial, tamanho da unidade (stake padrão) e gerencie seus dados locais
+          Defina sua banca inicial, tamanho da unidade (stake padrão) e gerencie a persistência dos dados
         </p>
       </div>
 
@@ -169,6 +200,69 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </form>
       </div>
 
+      {/* Supabase Cloud Database Integration */}
+      <div className="bg-[#0e1422]/95 border border-white/[0.07] rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
+              Persistência em Nuvem (Supabase)
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Projeto configurado: <span className="font-mono text-slate-200">{SUPABASE_PROJECT_REF}</span> ({SUPABASE_REGION}) • <span className="font-mono text-slate-300">{DEFAULT_SUPABASE_URL}</span>
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">sync</span>
+              <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Agora'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopySql}
+              className="px-3.5 py-2 bg-[#080c14] hover:bg-slate-800 border border-white/[0.08] text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px] text-blue-400">content_copy</span>
+              <span>Copiar SQL das Tabelas</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowSqlModal((v) => !v)}
+              className="px-3 py-2 bg-[#080c14] hover:bg-slate-800 border border-white/[0.08] text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+            >
+              {showSqlModal ? 'Ocultar SQL' : 'Ver SQL'}
+            </button>
+          </div>
+        </div>
+
+        {showSqlModal && (
+          <div className="bg-[#080c14] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-300">
+                Execute este script uma única vez no SQL Editor do seu projeto Supabase ({SUPABASE_PROJECT_REF}):
+              </span>
+              <button
+                type="button"
+                onClick={handleCopySql}
+                className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold"
+              >
+                Copiar Tudo
+              </button>
+            </div>
+            <pre className="text-[11px] font-mono text-slate-300 overflow-x-auto max-h-64 p-2 bg-[#05080f] rounded-lg border border-white/[0.05] select-all">
+              {SUPABASE_SQL_SCHEMA}
+            </pre>
+          </div>
+        )}
+      </div>
+
       {/* Backup & Data Control */}
       <div className="bg-[#0e1422]/95 border border-white/[0.07] rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col gap-4">
         <div>
@@ -176,7 +270,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             Backup & Controle de Dados
           </h3>
           <p className="text-xs text-slate-400">
-            Seus dados ficam salvos automaticamente no seu aparelho. Exporte um backup ou limpe os registros quando desejar.
+            Exporte um backup completo em JSON, restaure registros ou limpe os dados quando desejar.
           </p>
         </div>
 
