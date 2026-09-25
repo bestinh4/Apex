@@ -20,14 +20,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectTab,
   onOpenNewBetModal
 }) => {
-  const { currentEquity } = useBankroll();
+  const { currentEquity, currentUser, signOut } = useBankroll();
 
   const formatBRL = (val: number) => {
+    const clean = Number.isFinite(val) ? val : 0;
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
       minimumFractionDigits: 2
-    }).format(val);
+    }).format(clean);
   };
 
   const navItems: { key: TabKey; label: string; shortLabel: string; icon: string }[] = [
@@ -81,8 +82,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             })}
           </nav>
 
-          {/* Zone 3: Live Bankroll + Primary CTA */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Zone 3: Live Bankroll + Primary CTA + User Logout */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             <button
               type="button"
               onClick={() => onSelectTab('fluxo-de-caixa')}
@@ -104,6 +105,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="material-symbols-outlined text-[17px]">add</span>
               <span>Nova Aposta</span>
             </button>
+
+            {currentUser && (
+              <button
+                type="button"
+                onClick={signOut}
+                title={`Sair da conta (${currentUser.email})`}
+                className="p-2 rounded-xl bg-[#0d1322] border border-white/[0.06] hover:border-rose-500/30 text-slate-400 hover:text-rose-400 transition-colors flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[17px]">logout</span>
+                <span className="hidden xl:inline text-xs font-medium max-w-[100px] truncate">
+                  {currentUser.name}
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </header>

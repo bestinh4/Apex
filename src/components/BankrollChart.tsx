@@ -40,19 +40,25 @@ export const BankrollChart: React.FC<BankrollChartProps> = ({
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
+  const safeNum = (val: any, fallback = 0): number => {
+    const n = Number(val);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
   const formatBRL = (val: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(safeNum(val, 0));
 
   const formatCompactBRL = (val: number) => {
-    if (Math.abs(val) >= 10000) {
-      return `R$ ${(val / 1000).toFixed(1)}k`;
+    const clean = safeNum(val, 0);
+    if (Math.abs(clean) >= 10000) {
+      return `R$ ${(clean / 1000).toFixed(1)}k`;
     }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(val);
+    }).format(clean);
   };
 
   // Build chronological points from settled bets
@@ -61,10 +67,10 @@ export const BankrollChart: React.FC<BankrollChartProps> = ({
       .filter((b) => b.status !== 'PENDENTE')
       .reverse();
 
-    const totalBetPL = settledChronological.reduce((acc, b) => acc + b.pl, 0);
+    const totalBetPL = settledChronological.reduce((acc, b) => acc + safeNum(b.pl, 0), 0);
     // Base capital includes initialBankroll + net deposits/withdrawals/spins so final point equals currentEquity
-    const baseCapital = currentEquity - totalBetPL;
-    const safeUnit = unitValue > 0 ? unitValue : 25;
+    const baseCapital = safeNum(currentEquity, safeNum(initialBankroll, 1000)) - totalBetPL;
+    const safeUnit = safeNum(unitValue, 25) > 0 ? safeNum(unitValue, 25) : 25;
 
     const pts: ChartPoint[] = [
       {
@@ -83,28 +89,32 @@ export const BankrollChart: React.FC<BankrollChartProps> = ({
 
     let runningProfit = 0;
     settledChronological.forEach((bet, i) => {
-      runningProfit += bet.pl;
+      const betPL = safeNum(bet.pl, 0);
+      runningProfit += betPL;
       const runningEquity = baseCapital + runningProfit;
       const cumUnits = runningProfit / safeUnit;
-      const dUnits = bet.pl / safeUnit;
+      const dUnits = betPL / safeUnit;
+      const evLabel = bet.event && bet.event !== 'undefined' ? bet.event : 'Partida';
+      const mkLabel = bet.market && bet.market !== 'undefined' ? bet.market : 'Mercado Principal';
+      const dtLabel = bet.date && bet.date !== 'undefined' ? bet.date : 'Hoje';
 
       pts.push({
         index: i + 1,
-        label: bet.event,
-        sublabel: `${bet.market}${bet.bookmaker ? ` · ${bet.bookmaker}` : ''}`,
-        date: bet.date,
+        label: evLabel,
+        sublabel: `${mkLabel}${bet.bookmaker && bet.bookmaker !== 'undefined' ? ` · ${bet.bookmaker}` : ''}`,
+        date: dtLabel,
         equity: runningEquity,
         cumulativeProfit: runningProfit,
         cumulativeUnits: cumUnits,
-        deltaPL: bet.pl,
+        deltaPL: betPL,
         deltaUnits: dUnits,
-        odd: bet.odd,
+        odd: safeNum(bet.odd, 1.0),
         status: bet.status
       });
     });
 
     return pts;
-  }, [bets, currentEquity, unitValue]);
+  }, [bets, currentEquity, initialBankroll, unitValue]);
 
   // Apply range filter while keeping baseline context
   const visiblePoints = useMemo<ChartPoint[]>(() => {

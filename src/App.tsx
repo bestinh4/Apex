@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BankrollProvider } from './context/BankrollContext';
+import { BankrollProvider, useBankroll } from './context/BankrollContext';
 import { Navbar, TabKey } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { LedgerView } from './components/LedgerView';
@@ -7,6 +7,7 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { CashflowView } from './components/CashflowView';
 import { PromotionsView } from './components/PromotionsView';
 import { SettingsView } from './components/SettingsView';
+import { AuthView } from './components/AuthView';
 import { BetModal } from './components/BetModal';
 import { CashflowModal } from './components/CashflowModal';
 import { FreeSpinModal } from './components/FreeSpinModal';
@@ -15,6 +16,7 @@ import { Toast } from './components/Toast';
 import { BetEntry } from './types';
 
 function AppContent() {
+  const { currentUser, authLoading } = useBankroll();
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
   const [isBetModalOpen, setIsBetModalOpen] = useState(false);
   const [editingBet, setEditingBet] = useState<BetEntry | null>(null);
@@ -39,6 +41,26 @@ function AppContent() {
     setEditingBet(bet);
     setIsBetModalOpen(true);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#080c14] text-[#e2e8f0] flex flex-col items-center justify-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 animate-pulse">
+          <span className="material-symbols-outlined text-[22px]">account_balance_wallet</span>
+        </div>
+        <span className="text-xs font-medium text-slate-400">Carregando sua banca...</span>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <>
+        <AuthView onSuccessToast={showToast} />
+        <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#080c14] text-[#e2e8f0] flex flex-col bg-ambient-glow selection:bg-blue-500 selection:text-white">

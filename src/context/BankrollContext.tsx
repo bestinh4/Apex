@@ -12,7 +12,10 @@ import {
   defaultSettings
 } from '../data/initialData';
 import {
+  supabase,
   isSupabaseConfigured,
+  ensureValidUuid,
+  mapRowToBet,
   fetchAllFromSupabase,
   upsertBetToSupabase,
   deleteBetFromSupabase,
@@ -27,7 +30,16 @@ import {
   clearAllSupabaseTables
 } from '../lib/supabase';
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+}
+
 interface BankrollContextType {
+  currentUser: AuthUser | null;
+  authLoading: boolean;
+  signOut: () => Promise<void>;
   bets: BetEntry[];
   treasury: TreasuryEntry[];
   freebets: FreebetEntry[];
@@ -82,79 +94,163 @@ interface BankrollContextType {
 
 const BankrollContext = createContext<BankrollContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_PREFIX = 'apex_bankroll_clean_v1_';
+const STORAGE_VERSION = 'apex_bankroll_v3_';
+
+const finiteNumber = (v: any, fallback = 0): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+function getStorageKey(userId: string, key: string): string {
+  return `${STORAGE_VERSION}${userId}_${key}`;
+}
 
 export function BankrollProvider({ children }: { children: ReactNode }) {
-  const [bets, setBets] = useState<BetEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}bets`);
-      return saved ? JSON.parse(saved) : initialBets;
-    } catch {
-      return initialBets;
-    }
-  });
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
 
-  const [treasury, setTreasury] = useState<TreasuryEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}treasury`);
-      return saved ? JSON.parse(saved) : initialTreasury;
-    } catch {
-      return initialTreasury;
-    }
-  });
+  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [bets, setBets] = useState<BetEntry[]>(initialBets);
+  const [treasury, setTreasury] = useState<TreasuryEntry[]>(initialTreasury);
+  const [freebets, setFreebets] = useState<FreebetEntry[]>(initialFreebets);
+  const [freeSpins, setFreeSpins] = useState<FreeSpinEntry[]>(initialFreeSpins);
 
-  const [freebets, setFreebets] = useState<FreebetEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}freebets`);
-      return saved ? JSON.parse(saved) : initialFreebets;
-    } catch {
-      return initialFreebets;
+  // Listen to Supabase Auth session
+  useEffect(() => {
+    if (!supabase) {
+      setAuthLoading(false);
+      return;
     }
-  });
 
-  const [freeSpins, setFreeSpins] = useState<FreeSpinEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}freespins`);
-      return saved ? JSON.parse(saved) : initialFreeSpins;
-    } catch {
-      return initialFreeSpins;
-    }
-  });
+    let mounted = true;
 
-  const [settings, setSettings] = useState<AppSettings>(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      if (session?.user) {
+        const u = session.user;
+        setCurrentUser({
+          id: u.id,
+          email: u.email || '',
+          name:
+            u.user_metadata?.full_name ||
+            u.user_metadata?.name ||
+            (u.email ? u.email.split('@')[0] : 'Trader')
+        });
+      } else {
+        setCurrentUser(null);
+      }
+      setAuthLoading(false);
+    });
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      if (session?.user) {
+        const u = session.user;
+        setCurrentUser({
+          id: u.id,
+          email: u.email || '',
+          name:
+            u.user_metadata?.full_name ||
+            u.user_metadata?.name ||
+            (u.email ? u.email.split('@')[0] : 'Trader')
+        });
+      } else {
+        setCurrentUser(null);
+        setBets(initialBets);
+        setTreasury(initialTreasury);
+        setFreebets(initialFreebets);
+        setFreeSpins(initialFreeSpins);
+        setSettings(defaultSettings);
+      }
+      setAuthLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Load user-scoped localStorage whenever currentUser changes
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const uid = currentUser.id;
+
     try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}settings`);
-      return saved ? JSON.parse(saved) : defaultSettings;
+      const savedSettings = localStorage.getItem(getStorageKey(uid, 'settings'));
+      const parsedSettings = savedSettings ? JSON.parse(savedSettings) : null;
+      const userSettings: AppSettings = parsedSettings
+        ? {
+            ...defaultSettings,
+            ...parsedSettings,
+            initialBankroll: finiteNumber(
+              parsedSettings.initialBankroll,
+              defaultSettings.initialBankroll
+            ),
+            unitValue: finiteNumber(parsedSettings.unitValue, defaultSettings.unitValue)
+          }
+        : defaultSettings;
+      setSettings(userSettings);
+
+      const savedBets = localStorage.getItem(getStorageKey(uid, 'bets'));
+      const parsedBets = savedBets ? JSON.parse(savedBets) : [];
+      setBets(
+        Array.isArray(parsedBets)
+          ? parsedBets.map((item) => mapRowToBet(item, userSettings.unitValue))
+          : []
+      );
+
+      const savedTreasury = localStorage.getItem(getStorageKey(uid, 'treasury'));
+      setTreasury(savedTreasury ? JSON.parse(savedTreasury) : []);
+
+      const savedFreebets = localStorage.getItem(getStorageKey(uid, 'freebets'));
+      setFreebets(savedFreebets ? JSON.parse(savedFreebets) : []);
+
+      const savedSpins = localStorage.getItem(getStorageKey(uid, 'freespins'));
+      setFreeSpins(savedSpins ? JSON.parse(savedSpins) : []);
     } catch {
-      return defaultSettings;
+      setSettings(defaultSettings);
+      setBets([]);
+      setTreasury([]);
+      setFreebets([]);
+      setFreeSpins([]);
     }
-  });
+  }, [currentUser?.id]);
+
+  // Persist user-scoped localStorage on state changes
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    localStorage.setItem(getStorageKey(currentUser.id, 'bets'), JSON.stringify(bets));
+  }, [bets, currentUser?.id]);
 
   useEffect(() => {
-    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}bets`, JSON.stringify(bets));
-  }, [bets]);
+    if (!currentUser?.id) return;
+    localStorage.setItem(getStorageKey(currentUser.id, 'treasury'), JSON.stringify(treasury));
+  }, [treasury, currentUser?.id]);
 
   useEffect(() => {
-    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}treasury`, JSON.stringify(treasury));
-  }, [treasury]);
+    if (!currentUser?.id) return;
+    localStorage.setItem(getStorageKey(currentUser.id, 'freebets'), JSON.stringify(freebets));
+  }, [freebets, currentUser?.id]);
 
   useEffect(() => {
-    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}freebets`, JSON.stringify(freebets));
-  }, [freebets]);
+    if (!currentUser?.id) return;
+    localStorage.setItem(getStorageKey(currentUser.id, 'freespins'), JSON.stringify(freeSpins));
+  }, [freeSpins, currentUser?.id]);
 
   useEffect(() => {
-    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}freespins`, JSON.stringify(freeSpins));
-  }, [freeSpins]);
+    if (!currentUser?.id) return;
+    localStorage.setItem(getStorageKey(currentUser.id, 'settings'), JSON.stringify(settings));
+  }, [settings, currentUser?.id]);
 
-  useEffect(() => {
-    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}settings`, JSON.stringify(settings));
-  }, [settings]);
-
-  // Initial & Manual Cloud Sync with Supabase
+  // Cloud Sync with Supabase scoped strictly to currentUser.id
   const syncNow = useCallback(async (): Promise<boolean> => {
-    if (!isSupabaseConfigured) return false;
+    if (!isSupabaseConfigured || !currentUser?.id) return false;
+    const uid = currentUser.id;
     try {
-      const remote = await fetchAllFromSupabase();
+      const remote = await fetchAllFromSupabase(uid);
       if (!remote) return false;
 
       const hasRemoteData =
@@ -181,13 +277,16 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
           }));
         }
       } else if (hasLocalData) {
-        await pushAllStateToSupabase({
-          bets,
-          treasury,
-          freebets,
-          freeSpins,
-          settings
-        });
+        await pushAllStateToSupabase(
+          {
+            bets,
+            treasury,
+            freebets,
+            freeSpins,
+            settings
+          },
+          uid
+        );
       } else if (remote.settings) {
         setSettings((prev) => ({
           ...prev,
@@ -198,10 +297,10 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     } catch {
       return false;
     }
-  }, [bets, treasury, freebets, freeSpins, settings]);
+  }, [currentUser?.id, bets, treasury, freebets, freeSpins, settings]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured || !currentUser?.id) return;
     syncNow();
 
     const handleVisibility = () => {
@@ -212,41 +311,50 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     window.addEventListener('visibilitychange', handleVisibility);
     return () => window.removeEventListener('visibilitychange', handleVisibility);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser?.id]);
+
+  const signOut = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    setCurrentUser(null);
+  };
 
   // Compute Bet outcomes accurately based on status and fund type
   const calculateGrossAndPL = (stake: number, odd: number, status: BetStatus, type: string) => {
+    const s = finiteNumber(stake, 0);
+    const o = finiteNumber(odd, 1.0);
     let gross = 0;
     let pl = 0;
 
     if (status === 'GREEN') {
       if (type === 'Freebet') {
-        gross = stake * (odd - 1);
+        gross = s * (o - 1);
         pl = gross;
       } else {
-        gross = stake * odd;
-        pl = gross - stake;
+        gross = s * o;
+        pl = gross - s;
       }
     } else if (status === 'HALF_GREEN') {
       if (type === 'Freebet') {
-        gross = (stake * (odd - 1)) / 2;
+        gross = (s * (o - 1)) / 2;
         pl = gross;
       } else {
-        gross = stake + (stake * (odd - 1)) / 2;
-        pl = gross - stake;
+        gross = s + (s * (o - 1)) / 2;
+        pl = gross - s;
       }
     } else if (status === 'RED') {
       gross = 0;
-      pl = type === 'Freebet' ? 0 : -stake;
+      pl = type === 'Freebet' ? 0 : -s;
     } else if (status === 'HALF_RED') {
-      gross = type === 'Freebet' ? 0 : stake / 2;
-      pl = type === 'Freebet' ? 0 : -stake / 2;
+      gross = type === 'Freebet' ? 0 : s / 2;
+      pl = type === 'Freebet' ? 0 : -s / 2;
     } else if (status === 'VOID') {
-      gross = type === 'Freebet' ? 0 : stake;
+      gross = type === 'Freebet' ? 0 : s;
       pl = 0;
     } else if (status === 'CASHOUT') {
-      gross = stake * 1.15;
-      pl = gross - stake;
+      gross = s * 1.15;
+      pl = gross - s;
     } else if (status === 'PENDENTE') {
       gross = 0;
       pl = 0;
@@ -257,21 +365,23 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
 
   const addBet = (newBet: Omit<BetEntry, 'id' | 'gross' | 'pl'> & { gross?: number; pl?: number }) => {
     const { gross, pl } =
-      newBet.gross !== undefined && newBet.pl !== undefined
-        ? { gross: newBet.gross, pl: newBet.pl }
+      newBet.gross !== undefined && newBet.pl !== undefined && Number.isFinite(newBet.pl)
+        ? { gross: finiteNumber(newBet.gross, 0), pl: finiteNumber(newBet.pl, 0) }
         : calculateGrossAndPL(newBet.stake, newBet.odd, newBet.status, newBet.type);
 
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const safeUnit = settings.unitValue > 0 ? settings.unitValue : 25;
     const entry: BetEntry = {
       ...newBet,
-      id: `APX-${randomSuffix}`,
-      units: Number((newBet.stake / (settings.unitValue || 1)).toFixed(2)),
+      id: ensureValidUuid(),
+      units: Number((finiteNumber(newBet.stake, 0) / safeUnit).toFixed(2)),
       gross,
       pl
     };
 
     setBets((prev) => [entry, ...prev]);
-    upsertBetToSupabase(entry).catch(() => {});
+    if (currentUser?.id) {
+      upsertBetToSupabase(entry, currentUser.id).catch(() => {});
+    }
   };
 
   const updateBet = (id: string, updated: Partial<BetEntry>) => {
@@ -280,13 +390,16 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
         if (bet.id !== id) return bet;
         const merged = { ...bet, ...updated };
         const { gross, pl } = calculateGrossAndPL(merged.stake, merged.odd, merged.status, merged.type);
+        const safeUnit = settings.unitValue > 0 ? settings.unitValue : 25;
         const finalBet: BetEntry = {
           ...merged,
-          units: Number((merged.stake / (settings.unitValue || 1)).toFixed(2)),
+          units: Number((finiteNumber(merged.stake, 0) / safeUnit).toFixed(2)),
           gross,
           pl
         };
-        upsertBetToSupabase(finalBet).catch(() => {});
+        if (currentUser?.id) {
+          upsertBetToSupabase(finalBet, currentUser.id).catch(() => {});
+        }
         return finalBet;
       })
     );
@@ -294,7 +407,9 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
 
   const deleteBet = (id: string) => {
     setBets((prev) => prev.filter((bet) => bet.id !== id));
-    deleteBetFromSupabase(id).catch(() => {});
+    if (currentUser?.id) {
+      deleteBetFromSupabase(id, currentUser.id).catch(() => {});
+    }
   };
 
   const resolveBet = (id: string, status: BetStatus) => {
@@ -308,7 +423,9 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
           gross,
           pl
         };
-        upsertBetToSupabase(finalBet).catch(() => {});
+        if (currentUser?.id) {
+          upsertBetToSupabase(finalBet, currentUser.id).catch(() => {});
+        }
         return finalBet;
       })
     );
@@ -318,22 +435,29 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const entry: TreasuryEntry = {
       ...tx,
-      id: `TX-${randomSuffix}`
+      id: `TX-${randomSuffix}`,
+      amount: finiteNumber(tx.amount, 0)
     };
     setTreasury((prev) => [entry, ...prev]);
-    upsertTreasuryToSupabase(entry).catch(() => {});
+    if (currentUser?.id) {
+      upsertTreasuryToSupabase(entry, currentUser.id).catch(() => {});
+    }
   };
 
   const deleteTreasury = (id: string) => {
     setTreasury((prev) => prev.filter((tx) => tx.id !== id));
-    deleteTreasuryFromSupabase(id).catch(() => {});
+    if (currentUser?.id) {
+      deleteTreasuryFromSupabase(id, currentUser.id).catch(() => {});
+    }
   };
 
   const addFreebet = (fb: Omit<FreebetEntry, 'id'>) => {
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const entry: FreebetEntry = { ...fb, id: `FB-${randomSuffix}` };
     setFreebets((prev) => [entry, ...prev]);
-    upsertFreebetToSupabase(entry).catch(() => {});
+    if (currentUser?.id) {
+      upsertFreebetToSupabase(entry, currentUser.id).catch(() => {});
+    }
   };
 
   const updateFreebetStatus = (id: string, status: FreebetEntry['status']) => {
@@ -341,7 +465,9 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
       prev.map((fb) => {
         if (fb.id !== id) return fb;
         const updated = { ...fb, status };
-        upsertFreebetToSupabase(updated).catch(() => {});
+        if (currentUser?.id) {
+          upsertFreebetToSupabase(updated, currentUser.id).catch(() => {});
+        }
         return updated;
       })
     );
@@ -349,25 +475,33 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
 
   const deleteFreebet = (id: string) => {
     setFreebets((prev) => prev.filter((fb) => fb.id !== id));
-    deleteFreebetFromSupabase(id).catch(() => {});
+    if (currentUser?.id) {
+      deleteFreebetFromSupabase(id, currentUser.id).catch(() => {});
+    }
   };
 
   const addFreeSpin = (spin: Omit<FreeSpinEntry, 'id'>) => {
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const entry: FreeSpinEntry = { ...spin, id: `FS-${randomSuffix}` };
     setFreeSpins((prev) => [entry, ...prev]);
-    upsertFreeSpinToSupabase(entry).catch(() => {});
+    if (currentUser?.id) {
+      upsertFreeSpinToSupabase(entry, currentUser.id).catch(() => {});
+    }
   };
 
   const deleteFreeSpin = (id: string) => {
     setFreeSpins((prev) => prev.filter((fs) => fs.id !== id));
-    deleteFreeSpinFromSupabase(id).catch(() => {});
+    if (currentUser?.id) {
+      deleteFreeSpinFromSupabase(id, currentUser.id).catch(() => {});
+    }
   };
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => {
       const merged = { ...prev, ...newSettings };
-      upsertSettingsToSupabase(merged).catch(() => {});
+      if (currentUser?.id) {
+        upsertSettingsToSupabase(merged, currentUser.id).catch(() => {});
+      }
       return merged;
     });
   };
@@ -377,21 +511,32 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     setTreasury([]);
     setFreebets([]);
     setFreeSpins([]);
-    clearAllSupabaseTables().catch(() => {});
+    if (currentUser?.id) {
+      clearAllSupabaseTables(currentUser.id).catch(() => {});
+    }
   };
 
   const loadDemoData = () => {
-    setBets(demoBets);
+    const sanitizedDemoBets = demoBets.map((b) => ({
+      ...b,
+      id: ensureValidUuid(b.id)
+    }));
+    setBets(sanitizedDemoBets);
     setTreasury(demoTreasury);
     setFreebets(demoFreebets);
     setFreeSpins(demoFreeSpins);
-    pushAllStateToSupabase({
-      bets: demoBets,
-      treasury: demoTreasury,
-      freebets: demoFreebets,
-      freeSpins: demoFreeSpins,
-      settings
-    }).catch(() => {});
+    if (currentUser?.id) {
+      pushAllStateToSupabase(
+        {
+          bets: sanitizedDemoBets,
+          treasury: demoTreasury,
+          freebets: demoFreebets,
+          freeSpins: demoFreeSpins,
+          settings
+        },
+        currentUser.id
+      ).catch(() => {});
+    }
   };
 
   const importBackup = (data: {
@@ -401,14 +546,16 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     freeSpins?: FreeSpinEntry[];
     settings?: AppSettings;
   }) => {
-    const nextBets = Array.isArray(data.bets) ? data.bets : bets;
-    const nextTreasury = Array.isArray(data.treasury) ? data.treasury : treasury;
-    const nextFreebets = Array.isArray(data.freebets) ? data.freebets : freebets;
-    const nextFreeSpins = Array.isArray(data.freeSpins) ? data.freeSpins : freeSpins;
     const nextSettings =
       data.settings && typeof data.settings === 'object'
         ? { ...settings, ...data.settings }
         : settings;
+    const nextBets = Array.isArray(data.bets)
+      ? data.bets.map((b) => mapRowToBet(b, nextSettings.unitValue))
+      : bets;
+    const nextTreasury = Array.isArray(data.treasury) ? data.treasury : treasury;
+    const nextFreebets = Array.isArray(data.freebets) ? data.freebets : freebets;
+    const nextFreeSpins = Array.isArray(data.freeSpins) ? data.freeSpins : freeSpins;
 
     setBets(nextBets);
     setTreasury(nextTreasury);
@@ -416,36 +563,41 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     setFreeSpins(nextFreeSpins);
     setSettings(nextSettings);
 
-    pushAllStateToSupabase({
-      bets: nextBets,
-      treasury: nextTreasury,
-      freebets: nextFreebets,
-      freeSpins: nextFreeSpins,
-      settings: nextSettings
-    }).catch(() => {});
+    if (currentUser?.id) {
+      pushAllStateToSupabase(
+        {
+          bets: nextBets,
+          treasury: nextTreasury,
+          freebets: nextFreebets,
+          freeSpins: nextFreeSpins,
+          settings: nextSettings
+        },
+        currentUser.id
+      ).catch(() => {});
+    }
   };
 
-  // Computations
+  // Computations with NaN-safe finiteNumber guards
   const totalDeposits = useMemo(() => {
     return treasury
       .filter((t) => t.type === 'DEPOSIT' || t.type === 'BONUS')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + finiteNumber(t.amount, 0), 0);
   }, [treasury]);
 
   const totalWithdrawals = useMemo(() => {
     return treasury
       .filter((t) => t.type === 'WITHDRAW')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + finiteNumber(t.amount, 0), 0);
   }, [treasury]);
 
   const totalSpinsProfit = useMemo(() => {
-    return freeSpins.reduce((sum, s) => sum + s.netProfit, 0);
+    return freeSpins.reduce((sum, s) => sum + finiteNumber(s.netProfit, 0), 0);
   }, [freeSpins]);
 
   const totalFreebetsProfit = useMemo(() => {
     return freebets
       .filter((f) => f.status === 'Creditado')
-      .reduce((sum, f) => sum + f.netReturn, 0);
+      .reduce((sum, f) => sum + finiteNumber(f.netReturn, 0), 0);
   }, [freebets]);
 
   const {
@@ -468,13 +620,16 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     let turnover = 0;
 
     bets.forEach((b) => {
+      const stakeVal = finiteNumber(b.stake, 0);
+      const plVal = finiteNumber(b.pl, 0);
+
       if (b.status === 'PENDENTE') {
-        exposure += b.stake;
+        exposure += stakeVal;
         openCount++;
       } else {
         settledCount++;
-        profit += b.pl;
-        turnover += b.stake;
+        profit += plVal;
+        turnover += stakeVal;
 
         if (b.status === 'GREEN' || b.status === 'HALF_GREEN') {
           wins++;
@@ -499,7 +654,13 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
   }, [bets]);
 
   const currentEquity = useMemo(() => {
-    return settings.initialBankroll + netBetProfit + totalSpinsProfit + totalDeposits - totalWithdrawals;
+    return (
+      finiteNumber(settings.initialBankroll, 1000) +
+      netBetProfit +
+      totalSpinsProfit +
+      totalDeposits -
+      totalWithdrawals
+    );
   }, [settings.initialBankroll, netBetProfit, totalSpinsProfit, totalDeposits, totalWithdrawals]);
 
   const winRate = useMemo(() => {
@@ -511,22 +672,21 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     return turnoverVolume > 0 ? (netBetProfit / turnoverVolume) * 100 : 0;
   }, [netBetProfit, turnoverVolume]);
 
-  // Real streaks & drawdown computation
   const { maxWinStreak, maxLossStreak, currentStreakText, maxDrawdownPct } = useMemo(() => {
     let maxW = 0;
     let maxL = 0;
     let currentW = 0;
     let currentL = 0;
 
-    // Chronological order (oldest to newest)
     const chronological = [...bets].filter((b) => b.status !== 'PENDENTE').reverse();
 
-    let runningEquity = settings.initialBankroll;
-    let peakEquity = settings.initialBankroll;
+    const baseBankroll = finiteNumber(settings.initialBankroll, 1000);
+    let runningEquity = baseBankroll;
+    let peakEquity = baseBankroll;
     let maxDd = 0;
 
     chronological.forEach((b) => {
-      runningEquity += b.pl;
+      runningEquity += finiteNumber(b.pl, 0);
       if (runningEquity > peakEquity) {
         peakEquity = runningEquity;
       }
@@ -563,12 +723,17 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
     };
   }, [bets, settings.initialBankroll]);
 
-  const monthlyTargetAmount = (settings.initialBankroll * settings.monthlyTargetPct) / 100;
-  const stopLossDistance = (settings.initialBankroll * settings.maxDrawdownLimitPct) / 100;
+  const monthlyTargetAmount =
+    (finiteNumber(settings.initialBankroll, 1000) * finiteNumber(settings.monthlyTargetPct, 30)) / 100;
+  const stopLossDistance =
+    (finiteNumber(settings.initialBankroll, 1000) * finiteNumber(settings.maxDrawdownLimitPct, 25)) / 100;
 
   return (
     <BankrollContext.Provider
       value={{
+        currentUser,
+        authLoading,
+        signOut,
         bets,
         treasury,
         freebets,
@@ -611,7 +776,7 @@ export function BankrollProvider({ children }: { children: ReactNode }) {
         maxLossStreak,
         monthlyTargetAmount,
         stopLossDistance,
-        unitValue: settings.unitValue
+        unitValue: finiteNumber(settings.unitValue, 25)
       }}
     >
       {children}
