@@ -158,11 +158,24 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSuccessToast }) 
               local_fire_department
             </span>
           </div>
-          <div className="text-2xl font-mono font-bold text-emerald-400 mt-2 tabular-nums">
-            {maxWinStreak}G / {maxLossStreak}R
+          <div className="text-2xl font-mono font-bold mt-2 tabular-nums flex items-center gap-2">
+            <span className="text-emerald-400">{maxWinStreak}G</span>
+            <span className="text-slate-600 font-normal">/</span>
+            <span className="text-rose-500">{maxLossStreak}R</span>
           </div>
           <div className="text-xs text-slate-400 mt-1">
-            Momento atual: <span className="text-slate-200 font-medium">{currentStreakText}</span>
+            Momento atual:{' '}
+            <span
+              className={`font-semibold ${
+                currentStreakText.startsWith('+')
+                  ? 'text-emerald-400'
+                  : currentStreakText.startsWith('-')
+                  ? 'text-rose-400'
+                  : 'text-slate-200'
+              }`}
+            >
+              {currentStreakText}
+            </span>
           </div>
         </div>
 
