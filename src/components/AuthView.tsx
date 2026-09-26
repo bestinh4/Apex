@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface AuthViewProps {
   onSuccessToast?: (msg: string) => void;
@@ -281,10 +282,13 @@ export const AuthView: React.FC<AuthViewProps> = ({ onSuccessToast }) => {
           )}
         </form>
 
-        {/* Privacy note */}
-        <div className="pt-4 border-t border-white/[0.06] flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center">
-          <span className="material-symbols-outlined text-[15px] text-emerald-400">lock</span>
-          <span>Apostas, caixa e configurações 100% privados por usuário</span>
+        {/* Install App Button & Privacy note */}
+        <div className="pt-4 border-t border-white/[0.06] flex flex-col gap-3">
+          <PWAInstallButton variant="auth" />
+          <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center">
+            <span className="material-symbols-outlined text-[15px] text-emerald-400">lock</span>
+            <span>Apostas, caixa e configurações 100% privados por usuário</span>
+          </div>
         </div>
       </div>
     </div>

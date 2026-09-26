@@ -1,5 +1,6 @@
 import React from 'react';
 import { useBankroll } from '../context/BankrollContext';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export type TabKey =
   | 'dashboard'
@@ -96,6 +97,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {formatBRL(currentEquity)}
               </span>
             </button>
+
+            <PWAInstallButton variant="navbar" />
 
             <button
               type="button"

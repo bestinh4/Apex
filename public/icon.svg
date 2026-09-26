@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#080c14" />
+      <stop offset="50%" stopColor="#0e172a" />
+      <stop offset="100%" stopColor="#1e3a8a" />
+    </linearGradient>
+    <linearGradient id="chartGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stopColor="#3b82f6" />
+      <stop offset="100%" stopColor="#10b981" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  <rect x="24" y="24" width="464" height="464" rx="92" fill="none" stroke="#3b82f6" stroke-opacity="0.25" stroke-width="6" />
+  <path d="M112 352 L204 260 L276 304 L396 164" fill="none" stroke="url(#chartGrad)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M324 164 H396 V236" fill="none" stroke="#10b981" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="112" cy="352" r="18" fill="#3b82f6" />
+  <circle cx="204" cy="260" r="18" fill="#2563eb" />
+  <circle cx="276" cy="304" r="18" fill="#059669" />
+  <circle cx="396" cy="164" r="22" fill="#10b981" />
+</svg>
