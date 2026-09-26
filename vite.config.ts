@@ -28,7 +28,7 @@ export default defineConfig(() => {
           background_color: '#080c14',
           display: 'standalone',
           orientation: 'portrait-primary',
-          start_url: '/',
+          start_url: '/?source=pwa',
           scope: '/',
           lang: 'pt-BR',
           categories: ['finance', 'sports', 'productivity'],

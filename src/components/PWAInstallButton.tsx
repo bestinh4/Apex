@@ -6,25 +6,18 @@ interface PWAInstallButtonProps {
 }
 
 export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'navbar' }) => {
-  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
+  const { isInstallable, isIOS, canShowInstallUI, install, markAsInstalled } = usePWAInstall();
   const [showGuideModal, setShowGuideModal] = useState(false);
 
-  if (isInstalled) {
-    if (variant === 'card') {
-      return (
-        <div className="px-4 py-3 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-xs font-semibold text-emerald-400 flex items-center justify-center gap-2">
-          <span className="material-symbols-outlined text-[18px]">verified</span>
-          <span>App Instalado (Modo Nativo Ativo)</span>
-        </div>
-      );
-    }
+  // Completely hide button when app is installed or when native install prompt is not available
+  if (!canShowInstallUI) {
     return null;
   }
 
   const handleAction = async () => {
     if (isInstallable) {
       await install();
-    } else {
+    } else if (isIOS) {
       setShowGuideModal(true);
     }
   };
@@ -75,7 +68,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'n
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-white">
-                    Instalar Aplicativo Apex Bankroll
+                    Instalar no iPhone / iPad
                   </h3>
                   <p className="text-[11px] text-slate-400">
                     Instalação completa sem barra de navegador
@@ -91,66 +84,49 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'n
               </button>
             </div>
 
-            {isIOS ? (
-              <div className="flex flex-col gap-3 text-xs text-slate-300">
-                <p className="text-slate-400">
-                  No iPhone ou iPad (Safari), a Apple realiza a instalação nativa em 2 toques:
-                </p>
-                <div className="p-3.5 rounded-xl bg-[#080c14] border border-white/[0.06] flex flex-col gap-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 font-mono font-bold flex items-center justify-center shrink-0">
-                      1
-                    </span>
-                    <span>
-                      Toque no botão <strong>Compartilhar</strong> (ícone de quadrado com seta para cima) na barra do Safari.
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 font-mono font-bold flex items-center justify-center shrink-0">
-                      2
-                    </span>
-                    <span>
-                      Role para baixo e toque em <strong>Adicionar à Tela de Início</strong> e depois em <strong>Adicionar</strong>.
-                    </span>
-                  </div>
+            <div className="flex flex-col gap-3 text-xs text-slate-300">
+              <p className="text-slate-400">
+                No Safari do iOS, adicione o aplicativo em tela cheia em 2 passos:
+              </p>
+              <div className="p-3.5 rounded-xl bg-[#080c14] border border-white/[0.06] flex flex-col gap-2.5">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 font-mono font-bold flex items-center justify-center shrink-0">
+                    1
+                  </span>
+                  <span>
+                    Toque no botão <strong>Compartilhar</strong> na barra do Safari.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 font-mono font-bold flex items-center justify-center shrink-0">
+                    2
+                  </span>
+                  <span>
+                    Role para baixo e toque em <strong>Adicionar à Tela de Início</strong>.
+                  </span>
                 </div>
               </div>
-            ) : (
-              <div className="flex flex-col gap-3 text-xs text-slate-300">
-                <p className="text-slate-400">
-                  Para instalar o pacote completo do aplicativo (WebAPK no Android ou App Desktop no Windows/Mac):
-                </p>
-                <div className="p-3.5 rounded-xl bg-[#080c14] border border-white/[0.06] flex flex-col gap-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 font-mono font-bold flex items-center justify-center shrink-0">
-                      1
-                    </span>
-                    <span>
-                      No <strong>Chrome</strong> ou <strong>Edge</strong>, toque no menu <strong>⋮</strong> (três pontos no canto superior) ou no ícone de instalação na barra de endereços.
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 font-mono font-bold flex items-center justify-center shrink-0">
-                      2
-                    </span>
-                    <span>
-                      Selecione <strong>Instalar aplicativo</strong> (não apenas atalho) e confirme em <strong>Instalar</strong>.
-                    </span>
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-400">
-                  Nota: Caso você já tenha criado um atalho antigo antes desta atualização, remova o atalho antigo da tela inicial e recarregue a página para o Android gerar o instalador completo.
-                </p>
-              </div>
-            )}
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setShowGuideModal(false)}
-              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
-            >
-              Entendi
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  markAsInstalled();
+                  setShowGuideModal(false);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-[#080c14] hover:bg-slate-800 border border-white/[0.08] text-slate-300 text-xs font-semibold transition-colors"
+              >
+                Já instalei (ocultar botão)
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowGuideModal(false)}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
+              >
+                Entendi
+              </button>
+            </div>
           </div>
         </div>
       )}

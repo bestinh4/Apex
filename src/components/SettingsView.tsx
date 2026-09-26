@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useBankroll } from '../context/BankrollContext';
 import { PWAInstallButton } from './PWAInstallButton';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 import {
   SUPABASE_PROJECT_REF,
   SUPABASE_REGION,
@@ -30,6 +31,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     importBackup,
     syncNow
   } = useBankroll();
+  const { canShowInstallUI } = usePWAInstall();
 
   const [initialBankroll, setInitialBankroll] = useState(settings.initialBankroll.toString());
   const [unitValue, setUnitValue] = useState(settings.unitValue.toString());
@@ -300,20 +302,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         )}
       </div>
 
-      {/* Native App Installation Card (PWA) */}
-      <div className="bg-[#0e1422]/95 border border-white/[0.07] rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
-            Aplicativo Instalável (Android, iOS & Desktop)
-          </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Instale o aplicativo completo no seu aparelho para abrir em tela cheia, sem barra de endereço do navegador e com carregamento instantâneo.
-          </p>
+      {/* Native App Installation Card (PWA) - only displayed when not yet installed */}
+      {canShowInstallUI && (
+        <div className="bg-[#0e1422]/95 border border-white/[0.07] rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
+              Aplicativo Instalável (Android, iOS & Desktop)
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Instale o aplicativo completo no seu aparelho para abrir em tela cheia, sem barra de endereço do navegador e com carregamento instantâneo.
+            </p>
+          </div>
+          <div className="shrink-0">
+            <PWAInstallButton variant="card" />
+          </div>
         </div>
-        <div className="shrink-0">
-          <PWAInstallButton variant="card" />
-        </div>
-      </div>
+      )}
 
       {/* Backup & Data Control */}
       <div className="bg-[#0e1422]/95 border border-white/[0.07] rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col gap-4">
